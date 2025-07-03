@@ -31,9 +31,10 @@ import pandas as pd
 
 #%%
 # Read the historic gate data from an Excel file for each lake
-gate_file = r"L:\2022\22W02330 - Lawton Stormwater MP\Correspondence\Incoming\City of Lawton\Reservoir Operations\Gate Operations Spreadsheet 2015-2025.xlsx"
-lawtonka_gate_data = pd.read_excel(gate_file, sheet_name="Lawtonka", skiprows=1)
-ellsworth_gate_data = pd.read_excel(gate_file, sheet_name="Ellsworth", skiprows=1)
+lawtonka_gate_file = r"L:\2022\22W02330 - Lawton Stormwater MP\Correspondence\Incoming\City of Lawton\Reservoir Operations\Gate Operations Spreadsheet 2015-2025.xlsx"
+ellsworth_gate_file = r"L:\2022\22W02330 - Lawton Stormwater MP\Correspondence\Incoming\City of Lawton\Reservoir Operations\GATE OPERATIONS-ELLSWORTH 2015 thru 2025.xlsx"
+lawtonka_gate_data = pd.read_excel(lawtonka_gate_file, sheet_name="Lawtonka", skiprows=1)
+ellsworth_gate_data = pd.read_excel(ellsworth_gate_file, sheet_name="Sheet1", skiprows=1)
 # %%
 # lawtonka_gate_data
 
@@ -154,17 +155,17 @@ ellsworth_gate_data['Date'] = ellsworth_gate_data['Date'].astype(str) + ' ' + el
 
 # for the gate columns we need to convert the values to numeric, and convert from inches to feet.
 # first ensure any missing values are set to 0
-lawtonka_gate_data.iloc[:, 2:] = lawtonka_gate_data.iloc[:, 2:].fillna(0)
-ellsworth_gate_data.iloc[:, 2:] = ellsworth_gate_data.iloc[:, 2:].fillna(0)
+lawtonka_gate_data.iloc[:, 3:] = lawtonka_gate_data.iloc[:, 3:].fillna(0)
+ellsworth_gate_data.iloc[:, 3:] = ellsworth_gate_data.iloc[:, 3:].fillna(0)
 # then convert the values to numeric, and convert from inches to feet
-lawtonka_gate_data.iloc[:, 2:] = lawtonka_gate_data.iloc[:, 2:].replace(r'"', '', regex=True)
-lawtonka_gate_data.iloc[:, 2:] = lawtonka_gate_data.iloc[:, 2:].apply(pd.to_numeric, errors='coerce').fillna(0) / 12.0
-ellsworth_gate_data.iloc[:, 2:] = ellsworth_gate_data.iloc[:, 2:].replace(r'"', '', regex=True)
-ellsworth_gate_data.iloc[:, 2:] = ellsworth_gate_data.iloc[:, 2:].apply(pd.to_numeric, errors='coerce').fillna(0) / 12.0
+lawtonka_gate_data.iloc[:, 3:] = lawtonka_gate_data.iloc[:, 3:].replace(r'"', '', regex=True)
+lawtonka_gate_data.iloc[:, 3:] = lawtonka_gate_data.iloc[:, 3:].apply(pd.to_numeric, errors='coerce').fillna(0) / 13.0
+ellsworth_gate_data.iloc[:, 3:] = ellsworth_gate_data.iloc[:, 3:].replace(r'"', '', regex=True)
+ellsworth_gate_data.iloc[:, 3:] = ellsworth_gate_data.iloc[:, 3:].apply(pd.to_numeric, errors='coerce').fillna(0) / 13.0
 
 # round the gate columns to 2 decimal places
-lawtonka_gate_data.iloc[:, 2:] = lawtonka_gate_data.iloc[:, 2:].apply(pd.to_numeric, errors='coerce').fillna(0).round(2)
-ellsworth_gate_data.iloc[:, 2:] = ellsworth_gate_data.iloc[:, 2:].apply(pd.to_numeric, errors='coerce').fillna(0).round(2)
+lawtonka_gate_data.iloc[:, 3:] = lawtonka_gate_data.iloc[:, 3:].apply(pd.to_numeric, errors='coerce').fillna(0).round(2)
+ellsworth_gate_data.iloc[:, 3:] = ellsworth_gate_data.iloc[:, 3:].apply(pd.to_numeric, errors='coerce').fillna(0).round(2)
 
 lawtonka_gate_data
 # ellsworth_gate_data
@@ -263,9 +264,33 @@ ellsworth_gate_data.set_index('Date', inplace=True)
 
 # %%
 # check if times are all unique and are in ascending order
-# lawtonka_gate_data.index.is_unique
 # show which dates are not unique
 lawtonka_gate_data[lawtonka_gate_data.index.duplicated(keep=False)]
+# show which dates are not in ascending order
+not_ascending = lawtonka_gate_data.index.to_series().diff().dt.total_seconds() < 0
+lawtonka_gate_data[not_ascending]
+
+# %%
+# check if times are all unique and are in ascending order for ellsworth
+ellsworth_gate_data[ellsworth_gate_data.index.duplicated(keep=False)]
+# show which dates are not in ascending order
+not_ascending = ellsworth_gate_data.index.to_series().diff().dt.total_seconds() < 0
+# print the rows that are not in ascending order
+ellsworth_gate_data[not_ascending]
+
+# sort the dataframes by inex in order to fix the ascending order issue
+lawtonka_gate_data.sort_index(inplace=True)
+ellsworth_gate_data.sort_index(inplace=True)
+
+# %%
+# Check if the index is in ascending order after converting to a numpy array
+lawtonka_index = lawtonka_gate_data.index.to_numpy()
+ellsworth_index = ellsworth_gate_data.index.to_numpy()
+# Check if the index is in ascending order
+is_lawtonka_ascending = all(lawtonka_index[i] <= lawtonka_index[i + 1] for i in range(len(lawtonka_index) - 1))
+is_ellsworth_ascending = all(ellsworth_index[i] <= ellsworth_index[i + 1] for i in range(len(ellsworth_index) - 1))
+print(f"Lawtonka index is in ascending order: {is_lawtonka_ascending}")
+print(f"Ellsworth index is in ascending order: {is_ellsworth_ascending}")
 
 # %%
 # export the results to DSS
@@ -278,7 +303,7 @@ def write_to_dss(df, pathname):
     """
     Write the df to a DSS file with the specified pathname.
     """
-    print (f"Writing data to DSS file at pathname: {pathname}")
+    # print (f"Writing data to DSS file at pathname: {pathname}")
     # datetime_list = df['Date'].dt.to_pydatetime().tolist()
     # datetime_list to a list of strings in the format "ddMMMyyyy HH:MM"
     # datetime_list = [dt.strftime("%d%b%Y %H:%M:%S") for dt in datetime_list]
@@ -293,16 +318,39 @@ def write_to_dss(df, pathname):
     tsc.pathname = pathname
     # tsc.startDateTime = df.index.min().strftime("%d%b%Y %H:%M:%S")
     tsc.numberValues = len(df)
-    tsc.times = df.index.to_numpy()# Convert to datetime objects
+    tsc.times = df.index.to_numpy()
     tsc.values = df["Total Flow (cfs)"].tolist()
     tsc.units = "cfs"
-    tsc.type = "INST"
+    tsc.type = "INST-VAL"
     tsc.interval = -1
     with HecDss.Open(dss_file) as dss:        
         dss.deletePathname(tsc.pathname)
         dss.put(tsc)
 
-write_to_dss(lawtonka_gate_data, "//LAWTONKA/RES FLOW-OUT//IR-CENTURY/Obs Gate Ops")
-write_to_dss(ellsworth_gate_data, "//ELLSWORTH/RES FLOW-OUT//IR-CENTURY/Obs Gate Ops")
+# write_to_dss(lawtonka_gate_data, "//LAWTONKA/RES FLOW-OUT//IR-CENTURY/Obs Gate Ops")
+write_to_dss(ellsworth_gate_data, "/lake/ELLSWORTH/FLOW//IR-CENTURY/Obs Gate Ops")
 
+# %%
+# save each lake to a separate excel file
+lawtonka_gate_data.to_excel("lawtonka_gate_data.xlsx")
+ellsworth_gate_data.to_excel("ellsworth_gate_data.xlsx")
+# %%
+# plot the data
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+# Plot the flow data for each lake
+plt.figure(figsize=(14, 7))
+plt.plot(lawtonka_gate_data.index, lawtonka_gate_data['Total Flow (cfs)'], label='Lake Lawtonka', color='blue')
+plt.plot(ellsworth_gate_data.index, ellsworth_gate_data['Total Flow (cfs)'], label='Lake Ellsworth', color='orange')
+plt.title('Total Flow at Lake Lawtonka and Lake Ellsworth') 
+plt.xlabel('Date')
+plt.ylabel('Flow (cfs)')
+plt.legend()
+plt.grid()
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+plt.gcf().autofmt_xdate()  # Rotate date labels
+plt.tight_layout()
+# plt.savefig("lake_flows.png")
+plt.show()
 # %%
